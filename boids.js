@@ -3,23 +3,29 @@ const ctx = canvas.getContext('2d');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+ctx.fillStyle = 'teal';
 
 const centeringFactor = 0.005
-const avoidFactor = 0.05
+const avoidFactor = 0.04
 const matchVelocityFactor = 0.07
 
 const avoidDistance = 25
-const visualRange = 100
+const visualRange = 180
 
-const boidsNum = 400;
+const boidsNum = 500;
 const boids = [];
+
+const margin = 200;
+const turnFactor = 1;
+
+const speedLimit = 15;
 
 for (let i = 0; i < boidsNum; i++) {
     boids.push({
         x: Math.floor(Math.random() * canvas.width),
         y: Math.floor(Math.random() * canvas.height),
-        xv: 0,
-        yv: 0,
+        xv: Math.random() * 10 - 5,
+        yv: Math.random() * 10 - 5,
     });
 }
 
@@ -27,16 +33,7 @@ function distance(boid1, boid2) {
     return Math.sqrt((boid1.x - boid2.x) ** 2 + (boid1.y - boid2.y) ** 2);
 }
 
-// destructing is expensive performance-wise
-function distance2({x1, y1}, {x2, y2}) {
-    return Math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2);
-}
-
-
 function keepWithinScreenBounds(boid) {
-    const margin = 200;
-    const turnFactor = 1;
-
     if (boid.x < margin) boid.xv += turnFactor;
     if (boid.y < margin) boid.yv += turnFactor;
     if (boid.x > canvas.width - margin) boid.xv -= turnFactor;
@@ -44,9 +41,6 @@ function keepWithinScreenBounds(boid) {
 }
 
 function limitSpeed(boid) {
-    const speedLimit = 15;
-
-    // TODO optimize
     const speed = Math.sqrt(boid.xv * boid.xv + boid.yv * boid.yv);
 
     if (speed > speedLimit) {
@@ -55,69 +49,82 @@ function limitSpeed(boid) {
     }
 }
 
+// declare variables here and zero them in a loop to avoid GC
+let centreOfMassX = 0
+let centreOfMassY = 0
+
+let avoidX = 0
+let avoidY = 0
+
+let avgVelocityX = 0
+let avgVelocityY = 0
+
+let numberOfNeighbours = 0
+
 function draw() {
     requestAnimationFrame(draw)
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = 'teal';
-
     for (const boid of boids) {
-        let centreX = 0
-        let centreY = 0
+        centreOfMassX = 0
+        centreOfMassY = 0
 
-        let avoidX = 0
-        let avoidY = 0
+        avoidX = 0
+        avoidY = 0
 
-        let velocityX = 0
-        let velocityY = 0
+        avgVelocityX = 0
+        avgVelocityY = 0
+
+        numberOfNeighbours = 0
 
         for (const otherBoid of boids) {
             if (otherBoid === boid) continue;
 
-            centreX += otherBoid.x;
-            centreY += otherBoid.y;
-
             const curDistance = distance(boid, otherBoid);
+
+            if (curDistance > visualRange) continue;
+
+            centreOfMassX += otherBoid.x;
+            centreOfMassY += otherBoid.y;
+
+            avgVelocityX += otherBoid.xv;
+            avgVelocityY += otherBoid.yv;
+
             if (curDistance < avoidDistance) {
                 avoidX += boid.x - otherBoid.x;
                 avoidY += boid.y - otherBoid.y;
             }
 
-            if (curDistance < visualRange) {
-                velocityX += otherBoid.xv;
-                velocityY += otherBoid.yv;
-            }
+            numberOfNeighbours++;
         }
 
-        keepWithinScreenBounds(boid);
+        if (numberOfNeighbours > 0) {
+            // Rule 1: Boids try to fly towards the centre of mass
+            centreOfMassX = (centreOfMassX / numberOfNeighbours) - boid.x;
+            centreOfMassY = (centreOfMassY / numberOfNeighbours) - boid.y;
+            boid.xv += centreOfMassX * centeringFactor;
+            boid.yv += centreOfMassY * centeringFactor;
 
-        // Rule 1: Boids try to fly towards the centre of mass
-        const centreOfMassX = (centreX / boidsNum) - boid.x;
-        const centreOfMassY = (centreY / boidsNum) - boid.y;
-        boid.xv += centreOfMassX * centeringFactor;
-        boid.yv += centreOfMassY * centeringFactor;
+            // Rule 2: Boids try to keep a small distance away from other boids
+            boid.xv +=  avoidX * avoidFactor;
+            boid.yv += avoidY * avoidFactor;
 
-        // Rule 2: Boids try to keep a small distance away from other boids
-        boid.xv += avoidX * avoidFactor;
-        boid.yv += avoidY * avoidFactor;
-
-        // Rule 3: Boids try to match velocity with near boids.
-        const avgVelocityX = velocityX / boidsNum;
-        const avgVelocityY = velocityY / boidsNum;
-        boid.xv += avgVelocityX * matchVelocityFactor;
-        boid.yv += avgVelocityY * matchVelocityFactor;
+            // Rule 3: Boids try to match velocity with near boids.
+            avgVelocityX = avgVelocityX / numberOfNeighbours;
+            avgVelocityY = avgVelocityY / numberOfNeighbours;
+            boid.xv += avgVelocityX * matchVelocityFactor;
+            boid.yv += avgVelocityY * matchVelocityFactor;
+        }
 
         limitSpeed(boid);
+        keepWithinScreenBounds(boid);
 
-        // floor it so anti-aliasing doesn't kick in
-        boid.x = Math.floor(boid.x + boid.xv);
-        boid.y = Math.floor(boid.y + boid.yv);
+        // round it so anti-aliasing doesn't kick in
+        boid.x = (boid.x + boid.xv + 0.5) >> 0;
+        boid.y = (boid.y + boid.yv + 0.5) >> 0;
 
-        // boid.x += boid.xv;
-        // boid.y += boid.yv;
-
-        ctx.fillRect(boid.x, boid.y, 7, 7);
+        ctx.fillRect(boid.x, boid.y, 6, 6);
     }
 }
 
