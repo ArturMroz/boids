@@ -5,21 +5,21 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 ctx.fillStyle = '#302e21';
 
-const centeringFactor = 0.005
-const avoidFactor = 0.04
-const matchVelocityFactor = 0.07
+const centeringFactor = 0.005;
+const avoidFactor = 0.04;
+const matchVelocityFactor = 0.07;
 const turnAwayFromBoundsFactor = 1;
 
-const avoidDistance = 25
-const visualRange = 180;
+const avoidDistance = 25;
+const visualRange = 160;
 const boundsMargin = 200;
 
-const speedLimit = 15;
+const speedLimit = 14;
 
 const boidsNum = 500;
 const boids = new Array(boidsNum);
 
-for (let i = 0; i < boidsNum; i++) {
+for (let i = 0; i < boids.length; i++) {
     boids[i] = {
         x: Math.floor(Math.random() * canvas.width),
         y: Math.floor(Math.random() * canvas.height),
@@ -45,17 +45,20 @@ function limitSpeed(boid) {
 }
 
 // declare variables here and reuse them to avoid GC
-let centreOfMassX = 0, centreOfMassY = 0;
-let avoidOthersX = 0, avoidOthersY = 0;
-let avgVelocityX = 0, avgVelocityY = 0;
-let numberOfNeighbours = 0;
+
+let centreOfMassX, centreOfMassY;
+let avoidOthersX, avoidOthersY;
+let avgVelocityX, avgVelocityY;
+let numberOfNeighbours;
+let i, j;
+let distance;
 
 function draw() {
     requestAnimationFrame(draw)
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let i = 0; i < boidsNum; i++) {
+    for (i = 0; i < boidsNum; i++) {
         centreOfMassX = 0;
         centreOfMassY = 0;
 
@@ -67,8 +70,8 @@ function draw() {
 
         numberOfNeighbours = 0;
 
-        for (let j = 0; j < boidsNum; j++) {
-            const distance = Math.sqrt((boids[i].x - boids[j].x) ** 2 + (boids[i].y - boids[j].y) ** 2);
+        for (j = 0; j < boidsNum; j++) {
+            distance = Math.sqrt((boids[i].x - boids[j].x) ** 2 + (boids[i].y - boids[j].y) ** 2);
 
             if (distance > visualRange) continue;
 
