@@ -13,7 +13,7 @@ const avoidWallsFactor = 0.8;
 const avoidDistance = 25;
 const visualRange = 170;
 const boundsMargin = 180;
-const speedLimit = 16;
+const speedLimit = 15;
 
 const boidsNum = 700;
 
@@ -88,7 +88,7 @@ function draw() {
         vys[i] += centreOfMassY * centeringFactor;
 
         // Rule 2: Boids try to keep a small distance away from other boids
-        vxs[i] +=  avoidOthersX * avoidOthersFactor;
+        vxs[i] += avoidOthersX * avoidOthersFactor;
         vys[i] += avoidOthersY * avoidOthersFactor;
 
         // Rule 3: Boids try to match velocity with other boids
