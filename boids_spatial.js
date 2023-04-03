@@ -9,6 +9,7 @@ canvas.height = window.innerHeight;
 // simulation settings
 const centeringFactor = 0.005;
 const avoidOthersFactor = 0.03;
+const avoidPredatorFactor = 0.05;
 const matchVelocityFactor = 0.09;
 const avoidWallsFactor = 0.3;
 
@@ -57,13 +58,19 @@ for (let i = 0; i < numBoids; i++) {
     spatialHash[gIds[i]].add(i);
 }
 
+// init predator (mouse) position
+let predatorX = -1000;
+let predatorY = -1000;
+
+document.onmousemove = ({ clientX, clientY }) => { predatorX = clientX; predatorY = clientY; }
+
 // declare variables here and reuse them to avoid GC
 let centreOfMassX, centreOfMassY;
 let avoidOthersX, avoidOthersY;
 let avgVelocityX, avgVelocityY;
 let numberOfNeighbours;
 let i, j;
-let distance, speed;
+let distance, distanceFromPredator, speed;
 let outOfBounds;
 let oldId, newId;
 
@@ -140,6 +147,17 @@ function draw() {
         vxs[i] += avgVelocityX * matchVelocityFactor;
         vys[i] += avgVelocityY * matchVelocityFactor;
 
+        // avoid predator
+        if (predatorX > 0 && predatorY > 0) {
+            // distanceFromPredator = Math.abs(xs[i] - predatorX) + Math.abs(ys[i] - predatorY) // simplified distance calculation
+            distanceFromPredator = Math.sqrt((xs[i] - predatorX) ** 2 + (ys[i] - predatorY) ** 2);
+
+            if (visualRange > distanceFromPredator) {
+                vxs[i] += (xs[i] - predatorX) * avoidPredatorFactor;
+                vys[i] += (ys[i] - predatorY) * avoidPredatorFactor;
+            }
+        }
+
         // limit speed
         // speed = Math.sqrt(vxs[i] * vxs[i] + vys[i] ** 2 );
         speed = Math.abs(vxs[i]) + Math.abs(vys[i]); // simplified speed estimation
@@ -173,6 +191,10 @@ function draw() {
             spatialHash[newId].add(i);
         }
     }
+
+    // set predator position offscreen if mouse isn't actively moved
+    predatorX = -1000;
+    predatorY = -1000;
 }
 
 draw()
