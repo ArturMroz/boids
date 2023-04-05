@@ -6,19 +6,69 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// simulation settings
-const centeringFactor = 0.005;
-const avoidOthersFactor = 0.03;
-const avoidPredatorFactor = 0.05;
-const matchVelocityFactor = 0.09;
-const avoidWallsFactor = 0.3;
+// SIMULATION SETTINGS
 
-const avoidDistance = 14;
+let centeringFactor = 0.005; // coherence
+let avoidOthersFactor = 0.03; // separation
+let matchVelocityFactor = 0.09; // alignment
+
+let avoidPredatorFactor = 0.05;
+let avoidWallsFactor = 0.8;
+
+let speedLimit = 7;
+let avoidDistance = 14;
 const visualRange = 130;
-const boundsMargin = 50;
-const speedLimit = 9;
+const boundsMargin = 10;
 
-const numBoids = 3000;
+let mousePredator = true
+
+// SETTINGS UPDATE
+
+const coherenceControl = document.getElementById('coherence');
+coherenceControl.value = centeringFactor;
+coherenceControl.addEventListener('change', function (e) {
+    centeringFactor = e.target.valueAsNumber
+})
+
+const separationControl = document.getElementById('separation');
+separationControl.value = avoidOthersFactor;
+separationControl.addEventListener('change', function (e) {
+    avoidOthersFactor = e.target.valueAsNumber
+})
+
+const alignmentControl = document.getElementById('alignment');
+alignmentControl.value = matchVelocityFactor;
+alignmentControl.addEventListener('change', function (e) {
+    matchVelocityFactor = e.target.valueAsNumber
+})
+
+const speedControl = document.getElementById('speed');
+speedControl.value = speedLimit
+speedControl.addEventListener('change', function (e) {
+    speedLimit = e.target.valueAsNumber
+})
+
+// document.getElementById('mousePredator').addEventListener('change', function (e) {
+//     mousePredator = e.target.checked
+// })
+
+// prevent mouse events (disturbing birds) while cursor is inside settings panel
+document.querySelector(".settings").onmousemove = (e) => { e.stopPropagation() }
+
+// init predator (mouse) position
+let predatorX = -1000;
+let predatorY = -1000;
+
+document.onmousemove = (e) => {
+    if (mousePredator) {
+        predatorX = e.clientX;
+        predatorY = e.clientY;
+    }
+}
+
+// BOIDS SETUP 
+
+const numBoids = 5000;
 
 // allocate one buffer and divide it into 4 for float arrays
 const buf = new ArrayBuffer(numBoids * 4 * Float32Array.BYTES_PER_ELEMENT);
@@ -34,7 +84,8 @@ const vys = new Float32Array(buf, (3 * numBoids) * Float32Array.BYTES_PER_ELEMEN
 // positions inside spatial hash grid
 const gIds = new Uint16Array(numBoids);
 
-// spatial hash
+// SPATIAL HASH
+
 const cellSize = 50;
 const gridWidth = Math.ceil((window.innerWidth) / cellSize);
 const gridHeight = Math.ceil((window.innerHeight) / cellSize);
@@ -48,7 +99,8 @@ function getGridId(i) {
     return ~~(xs[i] / cellSize) + (~~(ys[i] / cellSize) * gridWidth);
 }
 
-// init positions and velocities
+// INIT POSITIONS AND VELOCITIES
+
 for (let i = 0; i < numBoids; i++) {
     xs[i] = Math.floor(Math.random() * canvas.width);
     ys[i] = Math.floor(Math.random() * canvas.height);
@@ -58,36 +110,23 @@ for (let i = 0; i < numBoids; i++) {
     spatialHash[gIds[i]].add(i);
 }
 
-// init predator (mouse) position
-let predatorX = -1000;
-let predatorY = -1000;
+// MAIN ANIMATION LOOP
 
-document.onmousemove = ({ clientX, clientY }) => { predatorX = clientX; predatorY = clientY; }
-
-// declare variables here and reuse them to avoid GC
-let centreOfMassX, centreOfMassY;
-let avoidOthersX, avoidOthersY;
-let avgVelocityX, avgVelocityY;
-let numberOfNeighbours;
-let i, j;
-let distance, distanceFromPredator, speed;
-let outOfBounds;
-let oldId, newId;
-
-// main animation loop
 function draw() {
     requestAnimationFrame(draw)
 
     // render
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (i = 0; i < numBoids; i++) {
-        ctx.fillRect(xs[i], ys[i], 4, 4);
+    ctx.beginPath()
+    for (let i = 0; i < numBoids; i++) {
+        ctx.rect(xs[i], ys[i], 4, 4);
     }
+    ctx.fill();
 
     // compute
-    for (i = 0; i < numBoids; i++) {
+    for (let i = 0; i < numBoids; i++) {
         // steer away from the screen bounds
-        outOfBounds = false;
+        let outOfBounds = false;
         if (xs[i] < boundsMargin) { outOfBounds = true; vxs[i] += avoidWallsFactor; }
         if (ys[i] < boundsMargin) { outOfBounds = true; vys[i] += avoidWallsFactor; }
         if (xs[i] > canvas.width - boundsMargin) { outOfBounds = true; vxs[i] -= avoidWallsFactor; }
@@ -100,20 +139,20 @@ function draw() {
             continue;
         }
 
-        centreOfMassX = 0;
-        centreOfMassY = 0;
+        let centreOfMassX = 0;
+        let centreOfMassY = 0;
 
-        avoidOthersX = 0;
-        avoidOthersY = 0;
+        let avoidOthersX = 0;
+        let avoidOthersY = 0;
 
-        avgVelocityX = 0;
-        avgVelocityY = 0;
+        let avgVelocityX = 0;
+        let avgVelocityY = 0;
 
-        numberOfNeighbours = 0;
+        let numberOfNeighbours = 0;
 
-        for (j of spatialHash[gIds[i]]) {
+        for (const j of spatialHash[gIds[i]]) {
             // distance = Math.sqrt((xs[i] - xs[j]) ** 2 + (ys[i] - ys[j]) ** 2);
-            distance = Math.abs(xs[i] - xs[j]) + Math.abs(ys[i] - ys[j]) // simplified distance calculation
+            const distance = Math.abs(xs[i] - xs[j]) + Math.abs(ys[i] - ys[j]) // simplified distance calculation
 
             if (distance > visualRange) continue;
 
@@ -131,17 +170,17 @@ function draw() {
             numberOfNeighbours++;
         }
 
-        // Rule 1: Boids try to fly towards the centre of mass
+        // Rule 1: Boids try to fly towards the centre of mass (coherence)
         centreOfMassX = (centreOfMassX / numberOfNeighbours) - xs[i];
         centreOfMassY = (centreOfMassY / numberOfNeighbours) - ys[i];
         vxs[i] += centreOfMassX * centeringFactor;
         vys[i] += centreOfMassY * centeringFactor;
 
-        // Rule 2: Boids try to keep a small distance away from other boids
+        // Rule 2: Boids try to keep a small distance away from other boids (separation)
         vxs[i] += avoidOthersX * avoidOthersFactor;
         vys[i] += avoidOthersY * avoidOthersFactor;
 
-        // Rule 3: Boids try to match velocity with other boids
+        // Rule 3: Boids try to match velocity with other boids (alignment)
         avgVelocityX = avgVelocityX / numberOfNeighbours;
         avgVelocityY = avgVelocityY / numberOfNeighbours;
         vxs[i] += avgVelocityX * matchVelocityFactor;
@@ -150,7 +189,7 @@ function draw() {
         // avoid predator
         if (predatorX > 0 && predatorY > 0) {
             // distanceFromPredator = Math.abs(xs[i] - predatorX) + Math.abs(ys[i] - predatorY) // simplified distance calculation
-            distanceFromPredator = Math.sqrt((xs[i] - predatorX) ** 2 + (ys[i] - predatorY) ** 2);
+            let distanceFromPredator = Math.sqrt((xs[i] - predatorX) ** 2 + (ys[i] - predatorY) ** 2);
 
             if (visualRange > distanceFromPredator) {
                 vxs[i] += (xs[i] - predatorX) * avoidPredatorFactor;
@@ -160,7 +199,7 @@ function draw() {
 
         // limit speed
         // speed = Math.sqrt(vxs[i] * vxs[i] + vys[i] ** 2 );
-        speed = Math.abs(vxs[i]) + Math.abs(vys[i]); // simplified speed estimation
+        const speed = Math.abs(vxs[i]) + Math.abs(vys[i]); // simplified speed estimation
         if (speed > speedLimit) {
             vxs[i] = (vxs[i] / speed) * speedLimit;
             vys[i] = (vys[i] / speed) * speedLimit;
@@ -176,9 +215,9 @@ function draw() {
     if (spatialHashUpdateCounter < 0) {
         spatialHashUpdateCounter = updateSpatialHashEveryNFrames;
 
-        for (i = 0; i < numBoids; i++) {
-            oldId = gIds[i];
-            newId = getGridId(i);
+        for (let i = 0; i < numBoids; i++) {
+            const oldId = gIds[i];
+            const newId = getGridId(i);
 
             // if the bird is still in the same cell, don't update spatial hash
             if (oldId == newId) continue;
